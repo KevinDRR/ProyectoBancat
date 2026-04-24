@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bancat</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='index.css') }}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="{{ request.url_for('home') }}" class="nav-logo">Bancat</a>
+    <div class="nav-links">
+        <a href="{{ request.url_for('home') }}" class="active">Inicio</a>
+        <a href="{{ request.url_for('home') }}#productos">Productos</a>
+        <a href="{{ request.url_for('credito') }}">Solicitar Credito</a>
+        <a href="{{ request.url_for('admin_login_page') }}">Admin</a>
+    </div>
+</nav>
+
+<section class="hero" style="--hero-image: url('{{ request.url_for('static', path='images/hero.jpg') }}');">
+    <span class="eyebrow">Banca personas, vivienda y pymes</span>
+    <h1>Un banco con cuentas, tarjetas, inversiones y creditos listos para originacion digital.</h1>
+    <p>Bancat centraliza productos financieros reales en una sola experiencia: ahorro, nomina, tarjetas, hipoteca, vehiculo, pyme, seguros e inversion respaldados por evaluacion automatizada de riesgo.</p>
+    <div class="hero-buttons">
+        <a href="{{ request.url_for('credito') }}" class="btn-primary">Solicitar Credito</a>
+        <a href="{{ request.url_for('home') }}#productos" class="btn-secondary">Ver Portafolio</a>
+    </div>
+    <div class="hero-highlights">
+        {% for producto in productos_destacados[:4] %}
+        <article class="hero-highlight">
+            <span>{{ producto.icono }}</span>
+            <div>
+                <strong>{{ producto.nombre }}</strong>
+                <small>{{ producto.tasa }}</small>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section section-intro">
+    <div class="section-copy">
+        <span class="section-tag">Banco multiproducto</span>
+        <h2>Portafolio con apariencia de banco real</h2>
+        <p>El catalogo se carga desde una base local y cubre el ciclo basico de un banco comercial: captacion, medios de pago, credito de consumo, vivienda, vehiculo, pyme, inversion y seguros.</p>
+    </div>
+    <div class="services-grid">
+        <article class="service-card">
+            <div class="service-icon">AI</div>
+            <h3>Scoring crediticio</h3>
+            <p>La aprobacion se apoya en el modelo de deep learning ya integrado al backend.</p>
+        </article>
+        <article class="service-card">
+            <div class="service-icon">DB</div>
+            <h3>Persistencia local</h3>
+            <p>Productos, clientes y solicitudes quedan guardados en SQLite para seguir iterando sin depender de servicios externos.</p>
+        </article>
+        <article class="service-card">
+            <div class="service-icon">24</div>
+            <h3>Canales digitales</h3>
+            <p>La experiencia queda preparada para onboarding digital, oficina virtual y seguimiento de solicitudes.</p>
+        </article>
+    </div>
+</section>
+
+<section class="section" id="productos">
+    <div class="section-copy centered">
+        <span class="section-tag">Productos del banco</span>
+        <h2>Catalogo principal</h2>
+        <p>Estos productos viven en la base local del proyecto y se pueden ampliar sin tocar la maqueta de la home.</p>
+    </div>
+    <div class="products-grid">
+        {% for producto in productos %}
+        <article class="product-card {% if producto.destacado %}featured{% endif %}">
+            <div class="product-top">
+                <span class="product-icon">{{ producto.icono }}</span>
+                <span class="product-category">{{ producto.categoria }}</span>
+            </div>
+            <h3>{{ producto.nombre }}</h3>
+            <p>{{ producto.descripcion }}</p>
+            <div class="product-meta">
+                <span>{{ producto.tasa }}</span>
+                <span>{{ producto.beneficio }}</span>
+            </div>
+            {% if producto.solicitable %}
+            <span class="product-chip">Disponible para solicitud online</span>
+            {% else %}
+            <span class="product-chip muted">Disponible por asesor</span>
+            {% endif %}
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="stats">
+    <div class="stats-grid">
+        {% for metrica in metricas %}
+        <article class="stat">
+            <h3>{{ metrica.valor }}</h3>
+            <p>{{ metrica.texto }}</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section channels-section">
+    <div class="section-copy centered narrow">
+        <span class="section-tag">Canales</span>
+        <h2>Operacion pensada para banca diaria</h2>
+    </div>
+    <div class="channels-grid">
+        <article class="channel-card">
+            <h3>App y banca web</h3>
+            <p>Consultas, pagos, transferencias, desembolsos y seguimiento de solicitudes desde un solo portal.</p>
+        </article>
+        <article class="channel-card">
+            <h3>Atencion especializada</h3>
+            <p>Ejecutivos para vivienda, pyme y premium con trazabilidad de solicitudes en linea.</p>
+        </article>
+        <article class="channel-card">
+            <h3>Modelo escalable</h3>
+            <p>La base local deja lista la migracion futura a un motor transaccional mas robusto.</p>
+        </article>
+    </div>
+</section>
+
+<footer class="footer">
+    <p>Bancat - Portafolio bancario local para demo de originacion y scoring crediticio.</p>
+</footer>
+
+</body>
+</html>

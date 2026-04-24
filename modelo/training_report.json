@@ -1,0 +1,46 @@
+{
+  "dataset": {
+    "muestras": 32000,
+    "prevalencia_riesgo": 0.041968751698732376,
+    "prob_default_media": 0.04320380949152004
+  },
+  "validation_metrics": {
+    "threshold": 0.365,
+    "accuracy": 0.8614294644717649,
+    "precision": 0.2314814814788023,
+    "recall": 0.9950248755723868,
+    "specificity": 0.8555893866880044,
+    "f1": 0.37558685139079107,
+    "balanced_accuracy": 0.9253071311301957,
+    "brier": 0.09780355202711262,
+    "auc": 0.9554770730947264,
+    "confusion": {
+      "tp": 200,
+      "fp": 664,
+      "tn": 3934,
+      "fn": 1
+    }
+  },
+  "test_metrics": {
+    "threshold": 0.365,
+    "accuracy": 0.8694294044148272,
+    "precision": 0.24242424242130395,
+    "recall": 0.9900990098519753,
+    "specificity": 0.8641304347807302,
+    "f1": 0.389483930620093,
+    "balanced_accuracy": 0.9271147223163527,
+    "brier": 0.08953476818676333,
+    "auc": 0.962757210503659,
+    "confusion": {
+      "tp": 200,
+      "fp": 625,
+      "tn": 3975,
+      "fn": 2
+    }
+  },
+  "best_epoch": 22,
+  "paths": {
+    "model": "C:\\Users\\kevin\\Desktop\\Deep Learning\\proyecto\\modelo\\modelo_riesgo.pth",
+    "stats": "C:\\Users\\kevin\\Desktop\\Deep Learning\\proyecto\\modelo\\normalizacion.json"
+  }
+}

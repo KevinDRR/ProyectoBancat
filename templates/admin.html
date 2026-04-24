@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrador | Bancat</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='admin.css') }}">
+</head>
+<body class="admin-page">
+
+<nav class="admin-nav">
+    <a class="nav-logo" href="{{ request.url_for('admin_dashboard') }}">Bancat Admin</a>
+    <div class="nav-links">
+        <a href="{{ request.url_for('home') }}">Sitio publico</a>
+        <a href="{{ request.url_for('credito') }}">Solicitar credito</a>
+        <a href="{{ request.url_for('admin_logout') }}">Cerrar sesion</a>
+    </div>
+</nav>
+
+<main class="admin-shell">
+    <section class="admin-hero">
+        <div>
+            <span class="auth-tag">Vista separada</span>
+            <h1>Auditoria y CRUD de solicitudes</h1>
+            <p>Desde aqui puedes crear nuevas entradas, editar la auditoria actual, archivar registros y eliminarlos definitivamente en un segundo paso.</p>
+        </div>
+        <div class="stats-grid">
+            <article class="stat-card">
+                <strong>{{ resumen.total }}</strong>
+                <span>Total registradas</span>
+            </article>
+            <article class="stat-card">
+                <strong>{{ resumen.activas }}</strong>
+                <span>Activas</span>
+            </article>
+            <article class="stat-card">
+                <strong>{{ resumen.archivadas }}</strong>
+                <span>Archivadas</span>
+            </article>
+        </div>
+    </section>
+
+    <section class="admin-grid">
+        <article class="admin-card form-card">
+            <div class="card-head">
+                <div>
+                    <h2 id="formTitle">Nueva entrada de auditoria</h2>
+                    <p>Usa el mismo modelo de riesgo del flujo publico para registrar o actualizar solicitudes.</p>
+                </div>
+                <button id="resetBtn" class="btn secondary" type="button">Limpiar</button>
+            </div>
+
+            <form id="auditForm">
+                <div class="form-grid">
+                    <div class="form-group full">
+                        <label for="producto_id">Producto</label>
+                        <select id="producto_id" required>
+                            <option value="">Seleccionar producto...</option>
+                            {% for producto in productos_credito %}
+                            <option value="{{ producto.id }}">{{ producto.nombre }} - {{ producto.categoria }} - {{ producto.tasa }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="nombre">Nombre</label>
+                        <input id="nombre" type="text" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="correo">Correo</label>
+                        <input id="correo" type="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edad">Edad</label>
+                        <input id="edad" type="number" min="18" max="90" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ingresos">Ingresos</label>
+                        <input id="ingresos" type="number" min="0" step="100000" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="estado_civil">Estado civil</label>
+                        <select id="estado_civil" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="0">Soltero</option>
+                            <option value="1">Casado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="deudas_existentes">Deudas existentes</label>
+                        <input id="deudas_existentes" type="number" min="0" step="100000" required>
+                    </div>
+                    <div class="form-group full">
+                        <label for="saldo_cuentas">Saldo en cuentas</label>
+                        <input id="saldo_cuentas" type="number" min="0" step="100000" required>
+                        <small class="field-help">Al guardar se recalcula automaticamente el riesgo y el estado del credito.</small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button id="submitBtn" class="btn" type="submit">Crear registro</button>
+                    <button id="cancelEditBtn" class="btn ghost hidden" type="button">Cancelar edicion</button>
+                </div>
+            </form>
+        </article>
+
+        <article class="admin-card info-card">
+            <h2>Reglas de borrado</h2>
+            <ul class="info-list">
+                <li>Primer clic en eliminar: la solicitud queda archivada y sale del listado publico.</li>
+                <li>Segundo clic sobre un registro archivado: se elimina definitivamente.</li>
+                <li>Los registros archivados pueden restaurarse antes del borrado final.</li>
+            </ul>
+        </article>
+    </section>
+
+    <section class="admin-card">
+        <div class="card-head table-head">
+            <div>
+                <h2>Auditoria actual</h2>
+                <p>Esta tabla reemplaza la gestion manual desde la vista de solicitar credito.</p>
+            </div>
+            <button id="refreshBtn" class="btn secondary" type="button">Actualizar</button>
+        </div>
+
+        <div id="auditMessage" class="message hidden"></div>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Estado</th>
+                        <th>Nombre</th>
+                        <th>Producto</th>
+                        <th>Correo</th>
+                        <th>Riesgo</th>
+                        <th>Creada</th>
+                        <th>Actualizada</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="auditBody">
+                    <tr>
+                        <td colspan="9" class="empty-cell">Cargando auditoria...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+    const ADMIN_API_BASE = {{ request.url_for('admin_listar_auditoria') | string | tojson }};
+    let editId = null;
+    let auditoriaActual = [];
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text ?? '';
+        return div.innerHTML;
+    }
+
+    function formatearFecha(valor) {
+        return valor ? valor.slice(0, 16) : '-';
+    }
+
+    function setMessage(texto, tipo = 'info') {
+        const box = document.getElementById('auditMessage');
+        box.className = `message ${tipo}`;
+        box.textContent = texto;
+    }
+
+    function limpiarFormulario() {
+        editId = null;
+        document.getElementById('auditForm').reset();
+        document.getElementById('formTitle').textContent = 'Nueva entrada de auditoria';
+        document.getElementById('submitBtn').textContent = 'Crear registro';
+        document.getElementById('cancelEditBtn').classList.add('hidden');
+    }
+
+    function leerFormulario() {
+        return {
+            producto_id: parseInt(document.getElementById('producto_id').value, 10),
+            nombre: document.getElementById('nombre').value.trim(),
+            correo: document.getElementById('correo').value.trim(),
+            edad: parseInt(document.getElementById('edad').value, 10),
+            ingresos: parseFloat(document.getElementById('ingresos').value),
+            estado_civil: parseInt(document.getElementById('estado_civil').value, 10),
+            deudas_existentes: parseFloat(document.getElementById('deudas_existentes').value),
+            saldo_cuentas: parseFloat(document.getElementById('saldo_cuentas').value),
+        };
+    }
+
+    async function requestJson(url, options = {}) {
+        const response = await fetch(url, options);
+        if (response.status === 401) {
+            window.location.href = {{ request.url_for('admin_login_page') | string | tojson }};
+            return null;
+        }
+
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.detail || data.error || 'No se pudo completar la operacion.');
+        }
+        return data;
+    }
+
+    function renderizarAuditoria(items) {
+        auditoriaActual = items;
+        const body = document.getElementById('auditBody');
+
+        if (!items.length) {
+            body.innerHTML = '<tr><td colspan="9" class="empty-cell">No hay registros en la auditoria.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = items.map((item) => {
+            const estado = item.archivada ? 'Archivada' : 'Activa';
+            const badgeClass = item.archivada ? 'archived' : (item.credito_aprobado ? 'approved' : 'rejected');
+            const prob = (item.probabilidad_riesgo * 100).toFixed(1);
+            const accionEliminar = item.archivada ? 'Eliminar' : 'Archivar';
+
+            return `
+                <tr class="${item.archivada ? 'row-archived' : ''}">
+                    <td>#${item.id}</td>
+                    <td><span class="status-badge ${badgeClass}">${estado}</span></td>
+                    <td>${escapeHtml(item.nombre)}</td>
+                    <td>${escapeHtml(item.producto_nombre)}</td>
+                    <td>${escapeHtml(item.correo)}</td>
+                    <td>${prob}%</td>
+                    <td>${formatearFecha(item.creado_en)}</td>
+                    <td>${formatearFecha(item.actualizada_en)}</td>
+                    <td class="actions">
+                        <button class="btn small secondary" type="button" onclick="editarSolicitud(${item.id})">Editar</button>
+                        ${item.archivada ? `<button class="btn small ghost" type="button" onclick="restaurarSolicitud(${item.id})">Restaurar</button>` : ''}
+                        <button class="btn small danger" type="button" onclick="eliminarSolicitud(${item.id})">${accionEliminar}</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function cargarAuditoria() {
+        const data = await requestJson(ADMIN_API_BASE);
+        if (data) {
+            renderizarAuditoria(data);
+        }
+    }
+
+    window.editarSolicitud = async function (id) {
+        try {
+            const item = await requestJson(`${ADMIN_API_BASE}/${id}`);
+            if (!item) {
+                return;
+            }
+
+            editId = id;
+            document.getElementById('producto_id').value = item.producto_id;
+            document.getElementById('nombre').value = item.nombre;
+            document.getElementById('correo').value = item.correo;
+            document.getElementById('edad').value = item.edad;
+            document.getElementById('ingresos').value = item.ingresos;
+            document.getElementById('estado_civil').value = item.estado_civil;
+            document.getElementById('deudas_existentes').value = item.deudas_existentes;
+            document.getElementById('saldo_cuentas').value = item.saldo_cuentas;
+            document.getElementById('formTitle').textContent = `Editando solicitud #${item.id}`;
+            document.getElementById('submitBtn').textContent = 'Guardar cambios';
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+            setMessage(`Solicitud #${item.id} cargada para edicion.`, 'success');
+        } catch (error) {
+            setMessage(error.message, 'error');
+        }
+    };
+
+    window.restaurarSolicitud = async function (id) {
+        try {
+            await requestJson(`${ADMIN_API_BASE}/${id}/restore`, { method: 'POST' });
+            setMessage(`Solicitud #${id} restaurada.`, 'success');
+            await cargarAuditoria();
+        } catch (error) {
+            setMessage(error.message, 'error');
+        }
+    };
+
+    window.eliminarSolicitud = async function (id) {
+        const actual = auditoriaActual.find((item) => item.id === id);
+        const pregunta = actual && actual.archivada
+            ? 'La solicitud ya esta archivada. Si continuas, se eliminara definitivamente.\n\nDeseas continuar?'
+            : 'La solicitud se archivara en este primer paso y dejara de verse en la vista publica.\n\nDeseas continuar?';
+
+        if (!window.confirm(pregunta)) {
+            return;
+        }
+
+        try {
+            const respuesta = await requestJson(`${ADMIN_API_BASE}/${id}`, { method: 'DELETE' });
+            const mensaje = respuesta.accion === 'archivada'
+                ? `Solicitud #${id} archivada.`
+                : `Solicitud #${id} eliminada definitivamente.`;
+            setMessage(mensaje, 'success');
+            await cargarAuditoria();
+        } catch (error) {
+            setMessage(error.message, 'error');
+        }
+    };
+
+    document.getElementById('auditForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const payload = leerFormulario();
+        const url = editId ? `${ADMIN_API_BASE}/${editId}` : ADMIN_API_BASE;
+        const method = editId ? 'PUT' : 'POST';
+
+        try {
+            const item = await requestJson(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            setMessage(
+                editId
+                    ? `Solicitud #${item.id} actualizada correctamente.`
+                    : `Solicitud #${item.id} creada correctamente.`,
+                'success'
+            );
+            limpiarFormulario();
+            await cargarAuditoria();
+        } catch (error) {
+            setMessage(error.message, 'error');
+        }
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', limpiarFormulario);
+    document.getElementById('cancelEditBtn').addEventListener('click', limpiarFormulario);
+    document.getElementById('refreshBtn').addEventListener('click', cargarAuditoria);
+
+    cargarAuditoria();
+</script>
+
+</body>
+</html>

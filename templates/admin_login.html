@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Administrador | Bancat</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='admin.css') }}">
+</head>
+<body class="admin-auth-page">
+
+<main class="auth-shell">
+    <a class="auth-back" href="{{ request.url_for('home') }}">Volver al sitio</a>
+
+    <section class="auth-card">
+        <span class="auth-tag">Administrador</span>
+        <h1>Panel de auditoria Bancat</h1>
+        <p>Accede a la consola interna para revisar solicitudes, editarlas, archivarlas y eliminarlas definitivamente cuando corresponda.</p>
+
+        <form id="loginForm" class="auth-form">
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <input id="username" name="username" type="text" value="admin" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Contrasena</label>
+                <input id="password" name="password" type="password" value="123" required>
+            </div>
+            <button class="btn" type="submit">Entrar</button>
+        </form>
+
+        <div id="loginMessage" class="message hidden"></div>
+        <p class="auth-hint">Credenciales demo: usuario <strong>admin</strong> y contrasena <strong>123</strong>.</p>
+    </section>
+</main>
+
+<script>
+    const LOGIN_URL = {{ request.url_for('admin_login_api') | string | tojson }};
+
+    function setLoginMessage(texto, tipo = 'error') {
+        const box = document.getElementById('loginMessage');
+        box.className = `message ${tipo}`;
+        box.textContent = texto;
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const payload = {
+            username: document.getElementById('username').value.trim(),
+            password: document.getElementById('password').value,
+        };
+
+        const response = await fetch(LOGIN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            setLoginMessage(data.detail || 'No fue posible iniciar sesion.');
+            return;
+        }
+
+        window.location.href = data.redirect;
+    });
+</script>
+
+</body>
+</html>

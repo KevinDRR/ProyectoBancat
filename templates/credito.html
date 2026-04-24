@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banco Gatuno</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='credito.css') }}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="{{ request.url_for('home') }}" class="nav-logo">Banco Gatuno</a>
+    <div class="nav-links">
+        <a href="{{ request.url_for('home') }}">Inicio</a>
+        <a href="{{ request.url_for('credito') }}" class="active">Solicitar Credito</a>
+        <a href="{{ request.url_for('admin_login_page') }}">Admin</a>
+    </div>
+</nav>
+
+<div class="container" style="margin-top: 5rem;">
+
+    <!-- Paso 1: Buscar cliente -->
+    <div class="card" id="paso1">
+        <h2>Solicitar producto de credito</h2>
+        <p class="step-desc">Selecciona el producto y valida tus datos para revisar si ya eres cliente del banco.</p>
+        <form id="formBuscar">
+            <div class="form-grid">
+                <div class="form-group form-group-full">
+                    <label>Producto</label>
+                    <select id="producto_id" required>
+                        <option value="">Seleccionar producto...</option>
+                        {% for producto in productos_credito %}
+                        <option value="{{ producto.id }}" data-nombre="{{ producto.nombre }}">{{ producto.nombre }} - {{ producto.categoria }} - {{ producto.tasa }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="field-help">Solo se muestran lineas que hoy pueden originarse desde este portal.</small>
+                </div>
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="nombre" placeholder="Ej: Michi Lopez" required>
+                </div>
+                <div class="form-group">
+                    <label>Correo electronico</label>
+                    <input type="email" id="correo" placeholder="Ej: michi@gatuno.com" required>
+                </div>
+            </div>
+            <button type="submit" class="btn">Continuar</button>
+        </form>
+    </div>
+
+    <!-- Paso 2: Formulario completo (solo si es cliente nuevo) -->
+    <div class="card hidden" id="paso2">
+        <h2>Completa tus datos</h2>
+        <p class="step-desc">No te encontramos en nuestro sistema. Necesitamos mas informacion para evaluar tu credito.</p>
+        <form id="formNuevo">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Edad</label>
+                    <input type="number" id="edad" min="18" max="80" placeholder="Ej: 30" required>
+                </div>
+                <div class="form-group">
+                    <label>Ingresos mensuales ($)</label>
+                    <input type="number" id="ingresos" min="0" step="100000" placeholder="Ej: 5000000" required>
+                </div>
+                <div class="form-group">
+                    <label>Estado civil</label>
+                    <select id="estado_civil" required>
+                        <option value="">Seleccionar...</option>
+                        <option value="0">Soltero</option>
+                        <option value="1">Casado</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Deudas existentes ($)</label>
+                    <input type="number" id="deudas" min="0" step="100000" placeholder="Ej: 10000000" required>
+                </div>
+                <div class="form-group">
+                    <label>Saldo en cuentas ($)</label>
+                    <input type="number" id="saldo" min="0" step="100000" placeholder="Ej: 20000000" required>
+                </div>
+            </div>
+            <button type="submit" class="btn">Solicitar Credito</button>
+            <button type="button" class="btn btn-back" onclick="volverPaso1()">Volver</button>
+        </form>
+    </div>
+
+    <!-- Paso 3: Cliente encontrado -->
+    <div class="card hidden" id="paso3">
+        <h2>Cliente encontrado</h2>
+        <p class="step-desc">Tus datos ya existen en la base local. Solo confirmaremos la solicitud del producto seleccionado.</p>
+        <div id="datosExistentes"></div>
+        <button class="btn" onclick="solicitarExistente()">Solicitar Credito con mis datos</button>
+        <button class="btn btn-back" onclick="volverPaso1()">Volver</button>
+    </div>
+
+    <!-- Resultado -->
+    <div id="resultado" class="resultado"></div>
+
+    <!-- Lista de clientes -->
+    <div class="card">
+        <h2>Solicitudes del Banco</h2>
+        <p class="step-desc">La administracion completa y la auditoria archivada se gestionan desde la vista de administrador.</p>
+        <div id="tablaContainer">
+            <p class="empty-msg">Cargando solicitudes...</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const API_ROUTES = {
+        buscarCliente: {{ request.url_for('buscar_cliente') | string | tojson }},
+        solicitarCredito: {{ request.url_for('solicitar_credito') | string | tojson }},
+        solicitarCreditoExistente: {{ request.url_for('solicitar_credito_existente') | string | tojson }},
+        listarClientes: {{ request.url_for('listar_clientes') | string | tojson }},
+    };
+    let clienteNombre = '';
+    let clienteCorreo = '';
+    let productoId = null;
+    let productoNombre = '';
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function leerProductoSeleccionado() {
+        const select = document.getElementById('producto_id');
+        productoId = parseInt(select.value, 10);
+        productoNombre = select.options[select.selectedIndex]?.dataset.nombre || '';
+    }
+
+    function mostrarError(mensaje) {
+        const resultado = document.getElementById('resultado');
+        resultado.className = 'resultado rechazado';
+        resultado.textContent = mensaje;
+    }
+
+    function formatearFecha(fechaTexto) {
+        if (!fechaTexto) {
+            return '-';
+        }
+        return fechaTexto.slice(0, 16);
+    }
+
+    function volverPaso1() {
+        document.getElementById('paso1').classList.remove('hidden');
+        document.getElementById('paso2').classList.add('hidden');
+        document.getElementById('paso3').classList.add('hidden');
+        document.getElementById('resultado').className = 'resultado';
+        document.getElementById('resultado').textContent = '';
+    }
+
+    // Paso 1: Buscar cliente
+    document.getElementById('formBuscar').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        leerProductoSeleccionado();
+        clienteNombre = document.getElementById('nombre').value;
+        clienteCorreo = document.getElementById('correo').value;
+
+        document.getElementById('resultado').className = 'resultado';
+
+        const res = await fetch(API_ROUTES.buscarCliente, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: clienteNombre, correo: clienteCorreo }),
+        });
+        const data = await res.json();
+
+        document.getElementById('paso1').classList.add('hidden');
+
+        if (data.encontrado) {
+            const c = data.cliente;
+            document.getElementById('datosExistentes').innerHTML = `
+                <div class="datos-resumen">
+                    <p><strong>Producto seleccionado:</strong> ${escapeHtml(productoNombre)}</p>
+                    <p><strong>Nombre:</strong> ${escapeHtml(c.nombre)}</p>
+                    <p><strong>Correo:</strong> ${escapeHtml(c.correo)}</p>
+                    <p><strong>Edad:</strong> ${c.edad}</p>
+                    <p><strong>Ingresos:</strong> $${Number(c.ingresos).toLocaleString()}</p>
+                </div>
+            `;
+            document.getElementById('paso3').classList.remove('hidden');
+        } else {
+            document.getElementById('paso2').classList.remove('hidden');
+        }
+    });
+
+    // Paso 2: Cliente nuevo
+    document.getElementById('formNuevo').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const body = {
+            nombre: clienteNombre,
+            correo: clienteCorreo,
+            edad: parseInt(document.getElementById('edad').value),
+            ingresos: parseFloat(document.getElementById('ingresos').value),
+            estado_civil: parseInt(document.getElementById('estado_civil').value),
+            deudas_existentes: parseFloat(document.getElementById('deudas').value),
+            saldo_cuentas: parseFloat(document.getElementById('saldo').value),
+            producto_id: productoId,
+        };
+
+        const res = await fetch(API_ROUTES.solicitarCredito, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            mostrarError(data.error || data.detail || 'No fue posible registrar la solicitud.');
+            return;
+        }
+        mostrarResultado(data.cliente);
+        document.getElementById('paso2').classList.add('hidden');
+        document.getElementById('formNuevo').reset();
+        cargarClientes();
+    });
+
+    // Paso 3: Cliente existente
+    async function solicitarExistente() {
+        const res = await fetch(API_ROUTES.solicitarCreditoExistente, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nombre: clienteNombre, correo: clienteCorreo, producto_id: productoId }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+            mostrarError(data.error || data.detail || 'No fue posible registrar la solicitud.');
+            return;
+        }
+        mostrarResultado(data.cliente);
+        document.getElementById('paso3').classList.add('hidden');
+        cargarClientes();
+    }
+
+    function mostrarResultado(cliente) {
+        const resultado = document.getElementById('resultado');
+        const prob = (cliente.probabilidad_riesgo * 100).toFixed(1);
+        const nivel = (cliente.nivel_riesgo || 'moderado').toUpperCase();
+        const factores = Array.isArray(cliente.factores_riesgo) && cliente.factores_riesgo.length
+            ? `<br><small>Factores clave: ${cliente.factores_riesgo.map(escapeHtml).join(' · ')}</small>`
+            : '';
+
+        if (cliente.credito_aprobado) {
+            resultado.className = 'resultado aprobado';
+            resultado.innerHTML = `<span class="result-product">${escapeHtml(cliente.producto_nombre)}</span>Credito <strong>APROBADO</strong> para ${escapeHtml(cliente.nombre)}.<br>Riesgo estimado: ${prob}% | Nivel: ${escapeHtml(nivel)}${factores}`;
+        } else {
+            resultado.className = 'resultado rechazado';
+            resultado.innerHTML = `<span class="result-product">${escapeHtml(cliente.producto_nombre)}</span>Credito <strong>RECHAZADO</strong> para ${escapeHtml(cliente.nombre)}.<br>Riesgo estimado: ${prob}% | Nivel: ${escapeHtml(nivel)}${factores}`;
+        }
+    }
+
+    async function cargarClientes() {
+        const res = await fetch(API_ROUTES.listarClientes);
+        const clientes = await res.json();
+        const container = document.getElementById('tablaContainer');
+
+        if (clientes.length === 0) {
+            container.innerHTML = '<p class="empty-msg">No hay solicitudes registradas</p>';
+            return;
+        }
+
+        let html = `<table>
+            <thead><tr>
+                <th>Nombre</th><th>Producto</th><th>Correo</th><th>Riesgo</th><th>Resultado</th><th>Fecha</th>
+            </tr></thead><tbody>`;
+
+        for (const c of clientes) {
+            const badgeClass = c.credito_aprobado ? 'si' : 'no';
+            const badgeText = c.credito_aprobado ? 'Aprobado' : 'Rechazado';
+            const prob = (c.probabilidad_riesgo * 100).toFixed(1);
+            html += `<tr>
+                <td>${escapeHtml(c.nombre)}</td>
+                <td>${escapeHtml(c.producto_nombre)}</td>
+                <td>${escapeHtml(c.correo)}</td>
+                <td>${prob}%</td>
+                <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+                <td>${formatearFecha(c.creado_en)}</td>
+            </tr>`;
+        }
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    cargarClientes();
+</script>
+
+</body>
+</html>
